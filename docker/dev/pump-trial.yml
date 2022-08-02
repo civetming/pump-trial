@@ -1,0 +1,59 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: pump-trial-service
+  namespace: default
+  labels:
+    serving.knative.dev/visibility: cluster-local
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '100'
+        autoscaling.knative.dev/minScale: '1'
+    spec:
+      containerConcurrency: 500
+      containers:
+        - command:
+            - java
+            - '-Xmx2g'
+            - '-Xms256m'
+            - '-Xmn128m'
+            - '-XX:+UseG1GC'
+            - '-XX:+HeapDumpOnOutOfMemoryError'
+            - '-Dspring.profiles.active=${activeProfile}'
+            - '-Duser.timezone=Asia/Shanghai'
+            - '-jar'
+            - /usr/local/cgmdc-sys/app.jar
+          env:
+            - name: JAVA_HOME
+              value: /usr/java/openjdk-17
+            - name: LANG
+              value: C.UTF-8
+            - name: aliyun_logs_pump-trial-service
+              value: stdout
+            - name: aliyun_logs_pump-trial-service_ttl
+              value: '7'
+          image: registry.cn-shenzhen.aliyuncs.com/sibionics_dev/pump-trial-service:${imageVersion}
+          ports:
+            - containerPort: 19110
+              name: http1
+          readinessProbe:
+            httpGet:
+              path: /k8sReadinessProbe
+            initialDelaySeconds: 90
+          livenessProbe:
+            httpGet:
+              path: /k8sLivenessProbe
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          resources:
+            limits:
+              cpu: 500m
+              memory: 2Gi
+            requests:
+              cpu: 100m
+              memory: 500Mi
